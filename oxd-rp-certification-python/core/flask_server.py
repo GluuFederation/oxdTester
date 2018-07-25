@@ -7,6 +7,7 @@ import sys
 import logging
 import configparser
 import urllib2
+import json
 from webfinger import finger
 import oxdpython
 from oxdpython import Client
@@ -15,17 +16,51 @@ import uris.authorize
 import uris.login_callback
 import uris.logout
 
+# Create the Flask app
+app = Flask(__name__)
+
+# Set the configuration file
+config = os.getcwd() + "/config.cfg"
+
+# Set the oxd client
+oxd_client = oxdpython.Client(config)
+
+# Fetch the configuration information
+op_openid_conf_response = urllib2.urlopen("https://rp.certification.openid.net:8080/mod_auth_openidc/rp-response_type-code/.well-known/openid-configuration") # QUICK FIX, REPLACE WITH VALUE FROM CONFIG FILE
+
+# Read the OP's configuration
+op_openid_conf = op_openid_conf_response.read()
+
 # Define the process_op_config() function
 def process_op_config():
 	# Function: process_op_config()
 	# Purpose: Process the OP's /.well-known/openid-configuration and return important values
 	# Arguments: None
 	
-	# Fetch the configuration information
-	op_openid_conf_response = urllib2.urlopen("https://rp.certification.openid.net:8080/mod_auth_openidc/rp-response_type-code/.well-known/openid-configuration") # QUICK FIX, REPLACE WITH VALUE FROM CONFIG FILE
+	# Attempt to get the OP configuration
+	try:
+		# Fetch the configuration information
+		op_openid_conf_response = urllib2.urlopen("https://rp.certification.openid.net:8080/mod_auth_openidc/rp-response_type-code/.well-known/openid-configuration") # QUICK FIX, REPLACE WITH VALUE FROM CONFIG FILE
 
-	# Read the OP's configuration
-	op_openid_conf = op_openid_conf_response.read()
+		# Read the OP's configuration
+		op_openid_conf = op_openid_conf_response.read()
+	except IOError:
+		# Display an error message and exit
+		print("[E] Error getting OP's OpenID configuration from /.well-known/openid-configuration. Please ensure that your OP is running properly and try again.")
+		exit(0)
+		
+		
+	# Parse the JSON response
+	parsed_json = json.loads(op_openid_conf)
+	
+	# Set and display important values
+	print("[I] Endpoints:")
+	authorization_endpoint = parsed_json["authorization_endpoint"] # The authorization endpoint
+	print("[+] Authorization Endpoint: {}".format(authorization_endpoint))
+	registration_endpoint = parsed_json["registration_endpoint"] # The registration endpoint
+	print("[+] Registration Endpoint: {}".format(registration_endpoint))
+	token_endpoint = parsed_json["token_endpoint"] # The token endpoint
+	print("[+] Token Endpoint: {}".format(token_endpoint))
 
 
 # Route and define the index() function
@@ -38,15 +73,12 @@ def index():
 	# Set the oxd client
 	oxd_client = oxdpython.Client(config)
 	
-	# DEBUGGING
-	print("[D] oxd Client: {}".format(oxd_client))
-	
 	# Register the site
 	global oxd_id 
 	oxd_id = oxd_client.register_site()
-	
-	# DEBUGGING
-	print("[D] oxd ID: {}".format(oxd_id))
+
+	# Parse the OP servers configuration
+	process_op_config()
 	
 	# Specify the path of the index file
 	webpage_index_path = "oxd-rp-certification-python/resources/site/index.html"
@@ -68,22 +100,5 @@ def test_1():
 	test_issuer = "https://rp.certification.openid.net:8080/oxd-server/rp-response_type-code"
 	test_log = "https://rp.certification.openid.net:8080/log/oxd-server/rp-response_type-code.txt"
 	
-	return(redirect("/test_1/"))
+	return(redirect("/authorize/"))
  
-# Create the Flask app
-app = Flask(__name__)
-
-# Set the configuration file
-config = os.getcwd() + "/config.cfg"
-
-# Set the oxd client
-oxd_client = oxdpython.Client(config)
-
-# Fetch the configuration information
-op_openid_conf_response = urllib2.urlopen("https://rp.certification.openid.net:8080/mod_auth_openidc/rp-response_type-code/.well-known/openid-configuration") # QUICK FIX, REPLACE WITH VALUE FROM CONFIG FILE
-
-# Read the OP's configuration
-op_openid_conf = op_openid_conf_response.read()
-
-# Display the OP's configuration
-print(op_openid_conf)
