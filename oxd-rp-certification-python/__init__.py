@@ -19,6 +19,3 @@ from core import flask_server
 __version__ = "0.0.2"
 __author__ = "Brandon Hammond"
 
-# Set debugging
-debug_mode = False
-
